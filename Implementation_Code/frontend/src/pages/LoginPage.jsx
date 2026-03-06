@@ -14,6 +14,15 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
+    // demo credentials
+    const DEMO_EMAIL = "bitoris115@keecs.com";
+    const DEMO_PASSWORD = "Test@123";
+
+    function fillDemo() {
+        setEmail(DEMO_EMAIL);
+        setPassword(DEMO_PASSWORD);
+    }
+
     async function handleSubmit(e) {
         e.preventDefault();
         setError('');
@@ -35,10 +44,37 @@ export default function LoginPage() {
                 <div className="auth-logo">
                     <GraduationCap size={28} />
                 </div>
+
                 <h1 className="auth-title">Welcome Back</h1>
                 <p className="auth-subtitle">Sign in to continue your learning journey</p>
 
                 {error && <div className="auth-error">{error}</div>}
+
+                {/* Demo credentials box */}
+                <div style={{
+                    background: "#f3f4f6",
+                    padding: "12px",
+                    borderRadius: "8px",
+                    marginBottom: "16px",
+                    fontSize: "14px"
+                }}>
+                    <b>Demo Account</b>
+                    <p style={{margin:"4px 0"}}>Email: {DEMO_EMAIL}</p>
+                    <p style={{margin:"4px 0"}}>Password: {DEMO_PASSWORD}</p>
+                    <button
+                        type="button"
+                        onClick={fillDemo}
+                        style={{
+                            marginTop: "6px",
+                            padding: "6px 10px",
+                            borderRadius: "6px",
+                            border: "none",
+                            cursor: "pointer"
+                        }}
+                    >
+                        Use Demo Account
+                    </button>
+                </div>
 
                 <form className="auth-form" onSubmit={handleSubmit}>
                     <div className="auth-field">
@@ -72,8 +108,14 @@ export default function LoginPage() {
                                 type="button"
                                 onClick={() => setShowPw(!showPw)}
                                 style={{
-                                    position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
-                                    background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer',
+                                    position: 'absolute',
+                                    right: 12,
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    background: 'none',
+                                    border: 'none',
+                                    color: 'var(--text-muted)',
+                                    cursor: 'pointer',
                                 }}
                             >
                                 {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
