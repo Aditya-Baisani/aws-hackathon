@@ -37,7 +37,7 @@ export default function ClarifyPage() {
         <div className="page-container" style={{ display: 'flex', flexDirection: 'column', height: '100%', paddingBottom: 20 }}>
             <div style={{ paddingBottom: 20, borderBottom: '1px solid var(--border-secondary)', marginBottom: 20 }}>
                 <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <HelpCircle size={28} style={{ color: 'var(--accent-primary)' }} /> Doubt Resolver
+                    <HelpCircle size={28} style={{ color: 'var(--accent-primary)' }} /> Term Clarifier
                 </h1>
                 <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
                     Get lightning-fast strict definitions for technical jargon or concepts.
