@@ -51,30 +51,42 @@ export default function LoginPage() {
                 {error && <div className="auth-error">{error}</div>}
 
                 {/* Demo credentials box */}
-                <div style={{
-                    background: "#f3f4f6",
-                    padding: "12px",
-                    borderRadius: "8px",
-                    marginBottom: "16px",
-                    fontSize: "14px"
-                }}>
-                    <b>Demo Account</b>
-                    <p style={{margin:"4px 0"}}>Email: {DEMO_EMAIL}</p>
-                    <p style={{margin:"4px 0"}}>Password: {DEMO_PASSWORD}</p>
-                    <button
-                        type="button"
-                        onClick={fillDemo}
-                        style={{
-                            marginTop: "6px",
-                            padding: "6px 10px",
-                            borderRadius: "6px",
-                            border: "none",
-                            cursor: "pointer"
-                        }}
-                    >
-                        Use Demo Account
-                    </button>
-                </div>
+                <div
+                          style={{
+                            background: "rgba(255,255,255,0.05)",
+                            border: "1px solid rgba(255,255,255,0.08)",
+                            backdropFilter: "blur(10px)",
+                            padding: "14px",
+                            borderRadius: "12px",
+                            marginBottom: "18px",
+                            color: "var(--text-muted)",
+                            fontSize: "14px"
+                          }}
+                        >
+                          <div style={{color:"#c084fc", fontWeight:"600", marginBottom:"6px"}}>
+                            Demo Account
+                          </div>
+                        
+                          <div>Email: bitoris115@keecs.com</div>
+                          <div>Password: Test@123</div>
+                        
+                          <button
+                            type="button"
+                            onClick={fillDemo}
+                            style={{
+                              marginTop: "10px",
+                              padding: "8px 14px",
+                              borderRadius: "8px",
+                              border: "none",
+                              cursor: "pointer",
+                              background: "linear-gradient(135deg,#8b5cf6,#ec4899)",
+                              color: "white",
+                              fontWeight: "500"
+                            }}
+                          >
+                            Use Demo Account
+                          </button>
+                        </div>
 
                 <form className="auth-form" onSubmit={handleSubmit}>
                     <div className="auth-field">
