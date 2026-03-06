@@ -1,10 +1,6 @@
 ================================================================================
-                    AI TUTOR - MANUAL AWS SETUP TASKS
+                    AI TUTOR - AWS SETUP PROCESS
 ================================================================================
-
-Follow these tasks IN ORDER to provision all AWS resources needed by the
-AI Tutor application. All resource names must match EXACTLY as specified
-below — the application code references these names via environment variables.
 
 ================================================================================
  1. AWS REGION
