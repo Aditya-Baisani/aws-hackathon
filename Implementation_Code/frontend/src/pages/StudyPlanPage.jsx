@@ -81,11 +81,21 @@ export default function StudyPlanPage() {
 
         setUploading(true);
         try {
+            // Step 1: Get presigned URL + materialId
             const res = await api.uploadMaterial(file);
+
+            // Step 2: PUT the actual bytes to S3
             if (res.presignedUrl) {
                 await api.uploadToS3(res.presignedUrl, file);
             }
-            toast.success('Material uploaded successfully!');
+
+            // Step 3: Trigger Textract via existing POST /materials/{materialId}
+            // This is the SAME route that already exists — no new API needed.
+            if (res.materialId) {
+                await api.processMaterial(res.materialId);
+            }
+
+            toast.success('Material uploaded! Text extraction started.');
             setFile(null);
             loadMaterials();
         } catch (err) {
@@ -100,6 +110,24 @@ export default function StudyPlanPage() {
             toast.error('Select a material or enter a topic name first');
             return;
         }
+
+        // Block generation if selected material is not ready yet
+        if (selectedMaterial) {
+            const material = materials.find(m => m.materialId === selectedMaterial);
+            if (material?.status === 'processing') {
+                toast.error('Material is still being processed. Please wait and try again.');
+                return;
+            }
+            if (material?.status === 'uploaded') {
+                toast.error('Material text extraction has not started yet. Please re-upload.');
+                return;
+            }
+            if (material?.status === 'failed') {
+                toast.error('Text extraction failed. Please try uploading again.');
+                return;
+            }
+        }
+
         if (dailyMinutes < 15 || dailyMinutes > 480) {
             toast.error('Daily time must be 15-480 minutes');
             return;
@@ -114,12 +142,11 @@ export default function StudyPlanPage() {
             const apiPayload = { dailyMinutes, totalDays, learningGoal };
             if (topicName.trim()) {
                 apiPayload.topicName = topicName.trim();
-                // Send an empty string or null for materialId if not needed by your api format.
             }
 
-            const res = await api.generatePlan(selectedMaterial || null, apiPayload);
+            await api.generatePlan(selectedMaterial || null, apiPayload);
             toast.success('Study plan generated!');
-            navigate('/'); // Direct to dashboard to see new plan immediately
+            navigate('/');
         } catch (err) {
             toast.error(err.message || 'Plan generation failed');
         } finally {
@@ -138,7 +165,6 @@ export default function StudyPlanPage() {
             } else {
                 await api.markComplete(topicId);
             }
-            // Update local state
             setActivePlan(prev => {
                 if (!prev) return prev;
                 const updated = { ...prev };
@@ -156,6 +182,24 @@ export default function StudyPlanPage() {
         }
     }
 
+    function statusBadge(status) {
+        const map = {
+            ready:      { bg: '#d1fae5', color: '#065f46', label: '✓ Ready' },
+            processing: { bg: '#fef3c7', color: '#92400e', label: '⏳ Processing' },
+            uploaded:   { bg: '#e0e7ff', color: '#3730a3', label: '↑ Uploaded' },
+            failed:     { bg: '#fee2e2', color: '#991b1b', label: '✗ Failed' },
+        };
+        const s = map[status] || map.uploaded;
+        return (
+            <span style={{
+                fontSize: 11, fontWeight: 600, padding: '2px 8px',
+                borderRadius: 12, background: s.bg, color: s.color, flexShrink: 0,
+            }}>
+                {s.label}
+            </span>
+        );
+    }
+
     return (
         <div className="page-container">
             <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 4 }}>Study Plan</h1>
@@ -163,7 +207,7 @@ export default function StudyPlanPage() {
                 Upload materials and generate a personalized learning roadmap
             </p>
 
-            {/* Upload Section */}
+            {/* ── Upload Section ── */}
             <div className="card" style={{ marginBottom: 24 }}>
                 <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
                     <Upload size={18} /> Upload Learning Material
@@ -193,13 +237,43 @@ export default function StudyPlanPage() {
                 {file && (
                     <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
                         <button className="btn btn-primary" onClick={handleUpload} disabled={uploading}>
-                            {uploading ? <><Loader size={16} className="spin" /> Uploading...</> : <><Upload size={16} /> Upload</>}
+                            {uploading
+                                ? <><Loader size={16} className="spin" /> Uploading...</>
+                                : <><Upload size={16} /> Upload</>}
                         </button>
+                    </div>
+                )}
+
+                {/* Materials list with live status badges */}
+                {materials.length > 0 && (
+                    <div style={{ marginTop: 20 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                            Your Materials
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {materials.map(m => (
+                                <div key={m.materialId} style={{
+                                    display: 'flex', alignItems: 'center', gap: 10,
+                                    padding: '8px 12px', borderRadius: 8,
+                                    background: 'var(--bg-secondary, #f9fafb)',
+                                    border: '1px solid var(--border-color, #e5e7eb)',
+                                }}>
+                                    <FileText size={14} style={{ flexShrink: 0, color: 'var(--text-secondary)' }} />
+                                    <span style={{
+                                        fontSize: 13, flex: 1,
+                                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                    }}>
+                                        {m.fileName}
+                                    </span>
+                                    {statusBadge(m.status)}
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 )}
             </div>
 
-            {/* Plan Generation */}
+            {/* ── Plan Generation ── */}
             <div className="card" style={{ marginBottom: 24 }}>
                 <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
                     <BookOpen size={18} /> Generate Study Plan
@@ -219,12 +293,20 @@ export default function StudyPlanPage() {
                             style={{ width: '100%', padding: '10px 14px', marginBottom: 8 }}
                             disabled={!!topicName.trim()}
                         >
-                            <option value="">{materials.length === 0 ? "No uploaded materials" : "Choose material..."}</option>
+                            <option value="">{materials.length === 0 ? 'No uploaded materials' : 'Choose material...'}</option>
                             {materials.map(m => (
-                                <option key={m.materialId} value={m.materialId}>{m.fileName}</option>
+                                <option
+                                    key={m.materialId}
+                                    value={m.materialId}
+                                    disabled={m.status !== 'ready'}
+                                >
+                                    {m.fileName}{m.status !== 'ready' ? ` (${m.status})` : ''}
+                                </option>
                             ))}
                         </select>
+
                         <div style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: 13, margin: '4px 0' }}>— OR —</div>
+
                         <input
                             type="text"
                             placeholder="Enter a topic name..."
@@ -277,13 +359,19 @@ export default function StudyPlanPage() {
                 </div>
 
                 <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end' }}>
-                    <button className="btn btn-primary" onClick={handleGeneratePlan} disabled={generating || (!selectedMaterial && !topicName.trim())}>
-                        {generating ? <><Loader size={16} className="spin" /> Generating...</> : <><Sparkles size={16} /> Generate Plan</>}
+                    <button
+                        className="btn btn-primary"
+                        onClick={handleGeneratePlan}
+                        disabled={generating || (!selectedMaterial && !topicName.trim())}
+                    >
+                        {generating
+                            ? <><Loader size={16} className="spin" /> Generating...</>
+                            : <><Sparkles size={16} /> Generate Plan</>}
                     </button>
                 </div>
             </div>
 
-            {/* Plan Display */}
+            {/* ── Plan Display ── */}
             {activePlan?.days && activePlan.days.length > 0 && (
                 <div>
                     <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>
@@ -294,7 +382,9 @@ export default function StudyPlanPage() {
                         <div className="plan-day" key={day.dayNumber}>
                             <div className="plan-day-header" onClick={() => toggleDay(day.dayNumber)}>
                                 <h3>
-                                    {expandedDays[day.dayNumber] ? <ChevronDown size={16} style={{ verticalAlign: -3 }} /> : <ChevronRight size={16} style={{ verticalAlign: -3 }} />}
+                                    {expandedDays[day.dayNumber]
+                                        ? <ChevronDown size={16} style={{ verticalAlign: -3 }} />
+                                        : <ChevronRight size={16} style={{ verticalAlign: -3 }} />}
                                     {' '}Day {day.dayNumber}
                                 </h3>
                                 <span>{day.topics?.length || 0} topics · {day.totalEstimatedMinutes || 0} min</span>
@@ -333,7 +423,7 @@ export default function StudyPlanPage() {
                 </div>
             )}
 
-            {/* Empty state */}
+            {/* ── Empty state ── */}
             {(!activePlan || !activePlan.days || activePlan.days.length === 0) && materials.length === 0 && (
                 <div className="empty-state">
                     <FileText size={48} />
