@@ -59,6 +59,7 @@ const api = {
     },
     getMaterials: () => request('GET', '/materials'),
     getMaterial: (id) => request('GET', `/materials/${id}`),
+    processMaterial: (id) => request('POST', `/materials/${id}`), 
 
     // Study Plans
     generatePlan: (materialId, params) =>
