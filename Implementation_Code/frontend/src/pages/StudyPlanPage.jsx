@@ -90,19 +90,66 @@ export default function StudyPlanPage() {
             }
 
             // Step 3: Trigger Textract via existing POST /materials/{materialId}
-            // This is the SAME route that already exists — no new API needed.
             if (res.materialId) {
                 await api.processMaterial(res.materialId);
             }
 
-            toast.success('Material uploaded! Text extraction started.');
+            toast.success('Material uploaded! Extracting text...');
             setFile(null);
-            loadMaterials();
+
+            // Step 4: Poll GET /materials/{id} every 4 seconds until ready or failed.
+            // This is what actually saves extractedText to DB — Textract is async
+            // and the backend only writes the text when this endpoint is called.
+            if (res.materialId) {
+                pollMaterialStatus(res.materialId);
+            } else {
+                loadMaterials();
+            }
         } catch (err) {
             toast.error(err.message || 'Upload failed');
         } finally {
             setUploading(false);
         }
+    }
+
+    function pollMaterialStatus(materialId) {
+        let attempts = 0;
+        const maxAttempts = 30; // 30 × 4s = 2 minutes max
+
+        const interval = setInterval(async () => {
+            attempts++;
+            try {
+                const res = await api.getMaterial(materialId);
+                const status = res?.status || res?.material?.status;
+
+                // Update this material's status live in the list
+                setMaterials(prev => prev.map(m =>
+                    m.materialId === materialId ? { ...m, ...res, ...(res.material || {}) } : m
+                ));
+
+                if (status === 'ready') {
+                    clearInterval(interval);
+                    toast.success('Text extraction complete! Material is ready.');
+                    loadMaterials();
+                } else if (status === 'failed') {
+                    clearInterval(interval);
+                    toast.error('Text extraction failed. Please try uploading again.');
+                } else if (attempts >= maxAttempts) {
+                    clearInterval(interval);
+                    toast.error('Extraction is taking too long. Try refreshing the page later.');
+                }
+            } catch {
+                clearInterval(interval);
+                loadMaterials();
+            }
+        }, 4000);
+
+        // Add the material immediately with processing status so it shows in the list right away
+        setMaterials(prev => {
+            const exists = prev.find(m => m.materialId === materialId);
+            if (exists) return prev;
+            return [...prev, { materialId, status: 'processing', fileName: file?.name || 'Uploading...' }];
+        });
     }
 
     async function handleGeneratePlan() {
