@@ -291,10 +291,99 @@ const STYLES = `
 `;
 
 // ─────────────────────────────────────────────────────────────────────────────
+// KATEX — lazy-load once, render math inline and block
+// ─────────────────────────────────────────────────────────────────────────────
+let _katexReady = false;
+let _katexPromise = null;
+
+function _ensureKatex() {
+    if (_katexReady) return Promise.resolve();
+    if (_katexPromise) return _katexPromise;
+    _katexPromise = new Promise((resolve) => {
+        if (!document.getElementById('katex-css')) {
+            const link = document.createElement('link');
+            link.id = 'katex-css'; link.rel = 'stylesheet';
+            link.href = 'https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css';
+            document.head.appendChild(link);
+        }
+        if (window.katex) { _katexReady = true; resolve(); return; }
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js';
+        script.onload = () => { _katexReady = true; resolve(); };
+        document.head.appendChild(script);
+    });
+    return _katexPromise;
+}
+
+// Renders a math expression using KaTeX (inline or display block)
+function MathNode({ latex, display = false }) {
+    const ref = useRef(null);
+    const [ready, setReady] = useState(_katexReady);
+
+    useEffect(() => {
+        if (!ready) { _ensureKatex().then(() => setReady(true)); }
+    }, []);
+
+    useEffect(() => {
+        if (!ready || !ref.current || !window.katex) return;
+        try {
+            window.katex.render(latex.trim(), ref.current, {
+                displayMode: display,
+                throwOnError: false,
+                output: 'html',
+            });
+        } catch {
+            if (ref.current) ref.current.textContent = latex;
+        }
+    }, [ready, latex, display]);
+
+    // Fallback while KaTeX loads
+    if (!ready) {
+        return (
+            <span style={{
+                fontFamily: "'JetBrains Mono', monospace", fontSize: 13,
+                color: 'var(--accent-primary)', opacity: 0.75,
+                background: 'rgba(124,106,255,0.08)',
+                padding: display ? '8px 16px' : '1px 6px',
+                borderRadius: 8,
+                display: display ? 'block' : 'inline',
+                margin: display ? '14px 0' : '0 2px',
+            }}>{latex}</span>
+        );
+    }
+
+    return (
+        <span
+            ref={ref}
+            style={{
+                display: display ? 'block' : 'inline',
+                margin: display ? '16px 0' : '0 2px',
+                padding: display ? '16px 20px' : '0',
+                background: display ? 'rgba(124,106,255,0.05)' : 'transparent',
+                borderRadius: display ? 12 : 0,
+                border: display ? '1px solid rgba(124,106,255,0.12)' : 'none',
+                overflowX: display ? 'auto' : 'visible',
+                textAlign: display ? 'center' : 'inherit',
+            }}
+        />
+    );
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
 // MARKDOWN PARSER
 // ─────────────────────────────────────────────────────────────────────────────
 function parseMarkdown(text) {
     if (!text) return null;
+
+    // Pre-process: collapse block math \[ ... \] and $$ ... $$ into single-line tokens
+    text = text.replace(/\\\[\s*([\s\S]*?)\s*\\\]/g, (_, l) =>
+        '%%BLOCKMATH%%' + l.replace(/\n/g, ' ') + '%%ENDMATH%%'
+    );
+    text = text.replace(/\$\$\s*([\s\S]*?)\s*\$\$/g, (_, l) =>
+        '%%BLOCKMATH%%' + l.replace(/\n/g, ' ') + '%%ENDMATH%%'
+    );
+
     const lines = text.split('\n');
     const elements = [];
     let i = 0, listBuffer = [], listType = null, k = 0;
@@ -316,18 +405,54 @@ function parseMarkdown(text) {
     }
 
     function inlineFmt(str) {
-        return str.split(/(\*\*.*?\*\*|\*[^*]+\*|`[^`]+`|\[.*?\]\(.*?\))/g).map((p, idx) => {
-            if (/^\*\*.*\*\*$/.test(p)) return <strong key={idx}>{p.slice(2,-2)}</strong>;
-            if (/^\*[^*]+\*$/.test(p))  return <em key={idx}>{p.slice(1,-1)}</em>;
-            if (/^`[^`]+`$/.test(p))    return <code key={idx}>{p.slice(1,-1)}</code>;
-            const lm = p.match(/^\[(.*?)\]\((.*?)\)$/);
-            if (lm) return <a key={idx} href={lm[2]} target="_blank" rel="noopener noreferrer">{lm[1]}</a>;
-            return p;
+        // Split on inline math \( ... \) and $...$ first
+        const mathChunks = str.split(/(\\\([\s\S]*?\\\)|\$[^$\n]+?\$)/g);
+        return mathChunks.map((chunk, ci) => {
+            if (/^\\\([\s\S]*?\\\)$/.test(chunk)) {
+                return <MathNode key={ci} latex={chunk.slice(2, -2)} />;
+            }
+            if (/^\$[^$]+\$$/.test(chunk)) {
+                return <MathNode key={ci} latex={chunk.slice(1, -1)} />;
+            }
+            // Regular inline formatting
+            return chunk.split(/(\*\*.*?\*\*|\*[^*]+\*|`[^`]+`|\[.*?\]\(.*?\))/g).map((p, idx) => {
+                if (/^\*\*.*\*\*$/.test(p)) return <strong key={idx}>{p.slice(2,-2)}</strong>;
+                if (/^\*[^*]+\*$/.test(p))  return <em key={idx}>{p.slice(1,-1)}</em>;
+                if (/^`[^`]+`$/.test(p))    return <code key={idx}>{p.slice(1,-1)}</code>;
+                const lm = p.match(/^\[(.*?)\]\((.*?)\)$/);
+                if (lm) return <a key={idx} href={lm[2]} target="_blank" rel="noopener noreferrer">{lm[1]}</a>;
+                return p;
+            });
         });
     }
 
     while (i < lines.length) {
         const raw = lines[i], t = raw.trim();
+
+        // Block math: \[ ... \] or $$ ... $$
+        if (t === '\\[' || t === '$$') {
+            flushList();
+            const closer = t === '\\[' ? '\\]' : '$$';
+            const mathLines = [];
+            i++;
+            while (i < lines.length && lines[i].trim() !== closer) { mathLines.push(lines[i]); i++; }
+            elements.push(<MathBlock key={key()} latex={mathLines.join('\n')} display={true} />);
+            i++; continue;
+        }
+        // Single-line block math: \[...\] on one line
+        if (/^\\\[.*\\\]$/.test(t)) {
+            flushList();
+            elements.push(<MathBlock key={key()} latex={t.slice(2, -2)} display={true} />);
+            i++; continue;
+        }
+
+        // ── Block math token (pre-processed \[...\] and $$...$$) ──
+        if (t.startsWith('%%BLOCKMATH%%')) {
+            flushList();
+            const latex = t.replace(/%%BLOCKMATH%%|%%ENDMATH%%/g, '').trim();
+            elements.push(<MathNode key={key()} latex={latex} display={true} />);
+            i++; continue;
+        }
 
         if (/^#{1,6} /.test(t)) {
             flushList();
@@ -578,6 +703,7 @@ export default function DashboardPage() {
             s.id = 'db-styles'; s.textContent = STYLES;
             document.head.appendChild(s);
         }
+        loadKatex(); // preload KaTeX so math renders instantly
         loadCurrentTopic();
     }, []);
 
