@@ -1,381 +1,581 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import {
-    Send, Brain, GraduationCap, RotateCw, CheckCircle, Trophy,
-    Loader, ChevronRight, BookOpen, ExternalLink, Zap
+    Brain, GraduationCap, RotateCw, CheckCircle, Trophy,
+    Loader, ChevronRight, BookOpen, ExternalLink, Zap,
+    Sparkles, Star, ArrowRight, ChevronLeft
 } from 'lucide-react';
 import api from '../lib/api';
 import { useDoubt } from '../contexts/DoubtContext';
 
-// ─── Injected styles ──────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// STYLES
+// ─────────────────────────────────────────────────────────────────────────────
 const STYLES = `
-@keyframes shimmer {
-    0%   { background-position: -600px 0; }
-    100% { background-position:  600px 0; }
-}
-@keyframes fadeSlideUp {
-    from { opacity: 0; transform: translateY(18px); }
-    to   { opacity: 1; transform: translateY(0); }
-}
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-}
-@keyframes pulse-ring {
-    0%   { transform: scale(0.92); opacity: .7; }
-    70%  { transform: scale(1.08); opacity: 0;  }
-    100% { transform: scale(0.92); opacity: 0;  }
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-@keyframes progressFill {
-    from { width: 0%; }
-    to   { width: var(--target-width); }
-}
-@keyframes bounceIn {
-    0%   { transform: scale(0.3); opacity: 0; }
-    50%  { transform: scale(1.08); }
-    70%  { transform: scale(0.95); }
-    100% { transform: scale(1); opacity: 1; }
-}
-@keyframes typewriter {
-    from { width: 0; }
-    to   { width: 100%; }
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  --db-radius: 24px;
+  --db-glow: rgba(124,106,255,0.18);
+  --db-glow-strong: rgba(124,106,255,0.35);
+  --db-green: #00e5a0;
+  --db-orange: #ff9f43;
+  --db-red: #ff6b6b;
 }
 
-/* Skeleton shimmer */
-.skeleton {
-    background: linear-gradient(90deg,
-        var(--bg-card-hover) 25%,
-        rgba(255,255,255,0.06) 50%,
-        var(--bg-card-hover) 75%
-    );
-    background-size: 600px 100%;
-    animation: shimmer 1.6s infinite linear;
-    border-radius: 8px;
+@keyframes db-shimmer {
+  0%   { background-position: -700px 0; }
+  100% { background-position:  700px 0; }
+}
+@keyframes db-fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+@keyframes db-fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes db-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: .7; transform: scale(0.97); }
+}
+@keyframes db-ring {
+  0%   { transform: scale(0.85); opacity: .8; }
+  70%  { transform: scale(1.15); opacity: 0;  }
+  100% { transform: scale(0.85); opacity: 0;  }
+}
+@keyframes db-spin     { to { transform: rotate(360deg); } }
+@keyframes db-bounceIn {
+  0%   { transform: scale(0.2) rotate(-10deg); opacity: 0; }
+  55%  { transform: scale(1.1) rotate(3deg);  opacity: 1; }
+  75%  { transform: scale(0.93) rotate(-1deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+@keyframes db-scoreCount {
+  from { opacity: 0; transform: translateY(12px) scale(0.9); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes db-glow-pulse {
+  0%, 100% { box-shadow: 0 0 20px var(--db-glow); }
+  50%       { box-shadow: 0 0 40px var(--db-glow-strong), 0 0 80px var(--db-glow); }
+}
+@keyframes db-slideLeft {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes db-dot {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40%            { transform: scale(1);   opacity: 1;   }
 }
 
-/* Flip card */
-.db-scene { perspective: 1400px; width: 100%; }
+/* ── Skeleton ── */
+.db-skeleton {
+  background: linear-gradient(90deg,
+    rgba(255,255,255,0.04) 25%,
+    rgba(255,255,255,0.09) 50%,
+    rgba(255,255,255,0.04) 75%
+  );
+  background-size: 700px 100%;
+  animation: db-shimmer 1.8s infinite linear;
+  border-radius: 8px;
+}
+
+/* ── Flip card ── */
+.db-scene { perspective: 1600px; width: 100%; }
 .db-card {
-    position: relative; width: 100%;
-    transform-style: preserve-3d;
-    transition: transform 0.75s cubic-bezier(0.4,0.2,0.2,1);
+  position: relative; width: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.8s cubic-bezier(0.35, 0.1, 0.15, 1.0);
 }
 .db-card.flipped { transform: rotateY(180deg); }
 .db-face {
-    backface-visibility: hidden;
-    -webkit-backface-visibility: hidden;
-    border-radius: 20px;
-    background: var(--bg-card);
-    border: 1px solid var(--border-secondary);
-    box-shadow: 0 16px 56px rgba(0,0,0,0.25), 0 0 24px rgba(124,106,255,0.06);
-    display: flex; flex-direction: column; overflow: hidden;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: var(--db-radius);
+  background: var(--bg-card);
+  border: 1px solid rgba(255,255,255,0.07);
+  box-shadow:
+    0 24px 64px rgba(0,0,0,0.32),
+    0 0 0 1px rgba(255,255,255,0.04) inset,
+    0 1px 0 rgba(255,255,255,0.08) inset;
+  display: flex; flex-direction: column; overflow: hidden;
 }
-.db-front { position: relative; }
-.db-back  { position: absolute; inset: 0; transform: rotateY(180deg); overflow-y: auto; padding: 32px; }
+.db-front { position: relative; min-height: 580px; }
+.db-back  {
+  position: absolute; inset: 0;
+  transform: rotateY(180deg);
+  overflow-y: auto; padding: 32px 36px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(124,106,255,0.3) transparent;
+}
 
-/* Quiz option button */
-.opt-btn {
-    display: flex; align-items: center; gap: 14px;
-    width: 100%; padding: 15px 18px;
-    border-radius: 12px; border: 1.5px solid var(--border-secondary);
-    background: var(--bg-card-hover); color: var(--text-primary);
-    font-size: 15px; cursor: pointer; text-align: left;
-    transition: border-color 0.18s, background 0.18s, transform 0.12s;
-    margin-bottom: 10px; animation: fadeSlideUp 0.25s ease both;
-}
-.opt-btn:hover:not(:disabled) {
-    border-color: var(--accent-primary);
-    background: rgba(124,106,255,0.09);
-    transform: translateX(3px);
-}
-.opt-btn.selected { border-color: var(--accent-primary); background: rgba(124,106,255,0.13); }
-.opt-btn.correct  { border-color: #00d2a0; background: rgba(0,210,160,0.13); color: #00d2a0; }
-.opt-btn.wrong    { border-color: #ff6b6b; background: rgba(255,107,107,0.10); color: #ff6b6b; }
-
-/* Markdown content */
-.md-content { font-size: 15px; line-height: 1.75; color: var(--text-primary); animation: fadeIn 0.4s ease; }
-.md-content h1 { font-size: 24px; font-weight: 800; margin: 28px 0 12px; color: var(--text-primary); }
-.md-content h2 { font-size: 20px; font-weight: 700; margin: 24px 0 10px; color: var(--text-primary); }
-.md-content h3 { font-size: 17px; font-weight: 700; margin: 20px 0 8px; color: var(--accent-primary); }
-.md-content h4 { font-size: 15px; font-weight: 700; margin: 16px 0 6px; color: var(--accent-primary); opacity: 0.85; }
-.md-content h5 { font-size: 14px; font-weight: 600; margin: 14px 0 4px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
-.md-content h6 { font-size: 13px; font-weight: 600; margin: 12px 0 4px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-.md-content p  { margin: 0 0 12px; }
-.md-content strong { color: var(--accent-primary); font-weight: 700; }
-.md-content em { font-style: italic; color: var(--text-secondary); }
-.md-content ul, .md-content ol { margin: 8px 0 12px 0; padding-left: 0; list-style: none; }
-.md-content li {
-    display: flex; gap: 10px; align-items: flex-start;
-    margin-bottom: 8px; padding: 8px 12px;
-    background: var(--bg-card-hover); border-radius: 8px;
-    border-left: 3px solid var(--accent-primary);
-    animation: fadeSlideUp 0.3s ease both;
-}
-.md-content li::before { content: '▸'; color: var(--accent-primary); flex-shrink: 0; margin-top: 1px; }
-.md-content code {
-    background: rgba(124,106,255,0.12); color: var(--accent-primary);
-    padding: 2px 7px; border-radius: 5px; font-size: 13px;
-    font-family: 'JetBrains Mono', 'Fira Code', monospace;
-}
-.md-content pre {
-    background: rgba(0,0,0,0.3); border: 1px solid var(--border-secondary);
-    border-radius: 10px; padding: 16px; overflow-x: auto; margin: 12px 0;
-}
-.md-content pre code { background: none; padding: 0; }
-.md-content blockquote {
-    border-left: 4px solid var(--accent-primary);
-    margin: 12px 0; padding: 10px 16px;
-    background: rgba(124,106,255,0.07); border-radius: 0 8px 8px 0;
-    color: var(--text-secondary); font-style: italic;
-}
-.md-content hr { border: none; border-top: 1px solid var(--border-secondary); margin: 20px 0; }
-.md-content a { color: var(--accent-primary); text-decoration: underline; }
-.md-content table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
-.md-content th { background: rgba(124,106,255,0.15); padding: 10px 14px; text-align: left; font-weight: 700; }
-.md-content td { padding: 9px 14px; border-bottom: 1px solid var(--border-secondary); }
-
-/* Tab active indicator */
+/* ── Tab bar ── */
 .db-tab {
-    background: none; border: none; padding: 16px 4px; font-size: 14px;
-    font-weight: 600; cursor: pointer; transition: color 0.2s;
-    border-bottom: 2px solid transparent; white-space: nowrap;
-    position: relative;
+  position: relative;
+  background: none; border: none;
+  padding: 18px 2px; font-size: 13px; font-weight: 600;
+  cursor: pointer; white-space: nowrap;
+  color: var(--text-secondary);
+  transition: color 0.2s;
+  font-family: 'Outfit', sans-serif;
+  letter-spacing: 0.2px;
 }
-.db-tab.active { color: var(--accent-primary); border-bottom-color: var(--accent-primary); }
-.db-tab:not(.active) { color: var(--text-secondary); }
+.db-tab::after {
+  content: '';
+  position: absolute; bottom: 0; left: 0; right: 0;
+  height: 2px; border-radius: 2px 2px 0 0;
+  background: var(--accent-primary);
+  transform: scaleX(0);
+  transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
+}
+.db-tab.active { color: var(--accent-primary); }
+.db-tab.active::after { transform: scaleX(1); }
 .db-tab:not(.active):hover { color: var(--text-primary); }
 
-/* Score bounce */
-.score-bounce { animation: bounceIn 0.6s cubic-bezier(0.36,0.07,0.19,0.97) both; }
+/* ── Quiz option ── */
+.db-opt {
+  display: flex; align-items: center; gap: 14px;
+  width: 100%; padding: 14px 18px;
+  border-radius: 14px;
+  border: 1.5px solid rgba(255,255,255,0.07);
+  background: rgba(255,255,255,0.03);
+  color: var(--text-primary); font-size: 14.5px;
+  cursor: pointer; text-align: left;
+  transition: border-color 0.15s, background 0.15s, transform 0.12s, box-shadow 0.15s;
+  margin-bottom: 10px;
+  animation: db-fadeUp 0.3s ease both;
+  font-family: 'Outfit', sans-serif;
+}
+.db-opt:hover:not(:disabled) {
+  border-color: var(--accent-primary);
+  background: rgba(124,106,255,0.08);
+  transform: translateX(4px);
+  box-shadow: -3px 0 12px rgba(124,106,255,0.15);
+}
+.db-opt.selected {
+  border-color: var(--accent-primary);
+  background: rgba(124,106,255,0.12);
+  box-shadow: 0 0 0 3px rgba(124,106,255,0.12), -3px 0 16px rgba(124,106,255,0.2);
+}
+.db-opt.correct {
+  border-color: var(--db-green);
+  background: rgba(0,229,160,0.1);
+  color: var(--db-green);
+  box-shadow: 0 0 0 3px rgba(0,229,160,0.12);
+}
+.db-opt.wrong {
+  border-color: var(--db-red);
+  background: rgba(255,107,107,0.1);
+  color: var(--db-red);
+}
+
+/* ── Markdown ── */
+.db-md {
+  font-size: 14.5px; line-height: 1.8;
+  color: var(--text-primary);
+  font-family: 'Outfit', sans-serif;
+  animation: db-fadeIn 0.35s ease;
+}
+.db-md h1 { font-size: 22px; font-weight: 800; margin: 32px 0 14px; color: var(--text-primary); letter-spacing: -0.3px; }
+.db-md h2 {
+  font-size: 18px; font-weight: 700; margin: 28px 0 12px;
+  color: var(--text-primary);
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.db-md h3 {
+  font-size: 15px; font-weight: 700; margin: 22px 0 8px;
+  color: var(--accent-primary);
+  display: flex; align-items: center; gap: 8px;
+}
+.db-md h3::before {
+  content: '';
+  display: inline-block; width: 4px; height: 16px;
+  background: var(--accent-primary); border-radius: 2px;
+  flex-shrink: 0;
+}
+.db-md h4 { font-size: 14px; font-weight: 700; margin: 18px 0 6px; color: var(--accent-primary); opacity: 0.85; }
+.db-md h5 { font-size: 12px; font-weight: 600; margin: 14px 0 4px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; }
+.db-md h6 { font-size: 11px; font-weight: 600; margin: 12px 0 4px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+.db-md p { margin: 0 0 14px; }
+.db-md strong { color: var(--accent-primary); font-weight: 700; }
+.db-md em { font-style: italic; color: var(--text-secondary); }
+.db-md ul, .db-md ol { margin: 8px 0 16px; padding-left: 0; list-style: none; }
+.db-md li {
+  display: flex; gap: 10px; align-items: flex-start;
+  margin-bottom: 7px; padding: 10px 14px;
+  background: rgba(124,106,255,0.05);
+  border-radius: 10px;
+  border: 1px solid rgba(124,106,255,0.12);
+  animation: db-fadeUp 0.3s ease both;
+  transition: background 0.2s, border-color 0.2s;
+}
+.db-md li:hover { background: rgba(124,106,255,0.09); border-color: rgba(124,106,255,0.22); }
+.db-md li-bullet { color: var(--accent-primary); flex-shrink: 0; margin-top: 2px; font-size: 12px; }
+.db-md code {
+  background: rgba(124,106,255,0.14); color: var(--accent-primary);
+  padding: 2px 8px; border-radius: 6px; font-size: 13px;
+  font-family: 'JetBrains Mono', monospace;
+  border: 1px solid rgba(124,106,255,0.2);
+}
+.db-md pre {
+  background: rgba(0,0,0,0.35);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px; padding: 18px 20px;
+  overflow-x: auto; margin: 14px 0;
+  position: relative;
+}
+.db-md pre::before {
+  content: 'code';
+  position: absolute; top: 10px; right: 14px;
+  font-size: 10px; color: rgba(255,255,255,0.2);
+  font-family: 'JetBrains Mono', monospace;
+  text-transform: uppercase; letter-spacing: 1px;
+}
+.db-md pre code { background: none; padding: 0; border: none; font-size: 13px; color: rgba(255,255,255,0.85); }
+.db-md blockquote {
+  border-left: 3px solid var(--accent-primary);
+  margin: 14px 0; padding: 12px 18px;
+  background: rgba(124,106,255,0.06);
+  border-radius: 0 12px 12px 0;
+  color: var(--text-secondary); font-style: italic;
+  position: relative;
+}
+.db-md blockquote::before {
+  content: '"';
+  position: absolute; top: -4px; left: 12px;
+  font-size: 32px; color: var(--accent-primary); opacity: 0.3;
+  font-family: Georgia, serif; line-height: 1;
+}
+.db-md hr { border: none; border-top: 1px solid rgba(255,255,255,0.07); margin: 24px 0; }
+.db-md a { color: var(--accent-primary); text-decoration: none; border-bottom: 1px solid rgba(124,106,255,0.35); transition: border-color 0.2s; }
+.db-md a:hover { border-bottom-color: var(--accent-primary); }
+.db-md table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13.5px; border-radius: 10px; overflow: hidden; }
+.db-md th { background: rgba(124,106,255,0.15); padding: 11px 16px; text-align: left; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+.db-md td { padding: 10px 16px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.db-md tr:hover td { background: rgba(255,255,255,0.02); }
+
+/* ── Score screen ── */
+.db-score-num {
+  font-family: 'Outfit', sans-serif;
+  font-size: 80px; font-weight: 900; line-height: 1;
+  animation: db-scoreCount 0.5s 0.2s ease both;
+  letter-spacing: -3px;
+}
+.db-trophy { animation: db-bounceIn 0.65s cubic-bezier(0.36,0.07,0.19,0.97) both; }
+
+/* ── Dots loader ── */
+.db-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent-primary); animation: db-dot 1.2s ease-in-out infinite; }
+.db-dot:nth-child(2) { animation-delay: 0.2s; }
+.db-dot:nth-child(3) { animation-delay: 0.4s; }
+
+/* ── Ambient glow on card ── */
+.db-glow-card { animation: db-glow-pulse 3s ease-in-out infinite; }
+
+/* ── Reading progress bar ── */
+.db-read-progress {
+  position: absolute; top: 0; left: 0; height: 3px;
+  background: linear-gradient(90deg, var(--accent-primary), #a78bfa);
+  border-radius: 0 3px 3px 0;
+  transition: width 0.1s linear;
+  z-index: 10;
+}
+
+/* ── Scrollbar ── */
+.db-content-scroll { scrollbar-width: thin; scrollbar-color: rgba(124,106,255,0.25) transparent; }
+.db-content-scroll::-webkit-scrollbar { width: 4px; }
+.db-content-scroll::-webkit-scrollbar-track { background: transparent; }
+.db-content-scroll::-webkit-scrollbar-thumb { background: rgba(124,106,255,0.25); border-radius: 4px; }
 `;
 
-// ─── Markdown Parser ──────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// MARKDOWN PARSER
+// ─────────────────────────────────────────────────────────────────────────────
 function parseMarkdown(text) {
     if (!text) return null;
-
     const lines = text.split('\n');
     const elements = [];
-    let i = 0;
-    let listBuffer = [];
-    let listType = null;
-    let keyCounter = 0;
-    const key = () => keyCounter++;
+    let i = 0, listBuffer = [], listType = null, k = 0;
+    const key = () => k++;
 
     function flushList() {
         if (!listBuffer.length) return;
-        const Tag = listType === 'ol' ? 'ol' : 'ul';
         elements.push(
-            <Tag key={key()} className={listType === 'ol' ? 'md-content' : undefined}
-                style={listType === 'ol' ? { paddingLeft: 0, listStyle: 'none' } : undefined}>
+            <ul key={key()} style={{ margin: '8px 0 16px', padding: 0, listStyle: 'none' }}>
                 {listBuffer.map((item, idx) => (
-                    <li key={idx} style={{ animationDelay: `${idx * 0.05}s` }}>
-                        <span>{inlineFormat(item)}</span>
+                    <li key={idx} className="db-md li" style={{ animationDelay: `${idx * 0.04}s` }}>
+                        <span style={{ color: 'var(--accent-primary)', flexShrink: 0, fontSize: 10, marginTop: 4 }}>▸</span>
+                        <span>{inlineFmt(item)}</span>
                     </li>
                 ))}
-            </Tag>
+            </ul>
         );
-        listBuffer = [];
-        listType = null;
+        listBuffer = []; listType = null;
     }
 
-    function inlineFormat(str) {
-        // Bold, italic, inline code, links
-        const parts = str.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`|\[.*?\]\(.*?\))/g);
-        return parts.map((part, idx) => {
-            if (part.startsWith('**') && part.endsWith('**'))
-                return <strong key={idx}>{part.slice(2, -2)}</strong>;
-            if (part.startsWith('*') && part.endsWith('*') && part.length > 2)
-                return <em key={idx}>{part.slice(1, -1)}</em>;
-            if (part.startsWith('`') && part.endsWith('`'))
-                return <code key={idx}>{part.slice(1, -1)}</code>;
-            const linkMatch = part.match(/^\[(.*?)\]\((.*?)\)$/);
-            if (linkMatch)
-                return <a key={idx} href={linkMatch[2]} target="_blank" rel="noopener noreferrer">{linkMatch[1]}</a>;
-            return part;
+    function inlineFmt(str) {
+        return str.split(/(\*\*.*?\*\*|\*[^*]+\*|`[^`]+`|\[.*?\]\(.*?\))/g).map((p, idx) => {
+            if (/^\*\*.*\*\*$/.test(p)) return <strong key={idx}>{p.slice(2,-2)}</strong>;
+            if (/^\*[^*]+\*$/.test(p))  return <em key={idx}>{p.slice(1,-1)}</em>;
+            if (/^`[^`]+`$/.test(p))    return <code key={idx}>{p.slice(1,-1)}</code>;
+            const lm = p.match(/^\[(.*?)\]\((.*?)\)$/);
+            if (lm) return <a key={idx} href={lm[2]} target="_blank" rel="noopener noreferrer">{lm[1]}</a>;
+            return p;
         });
     }
 
     while (i < lines.length) {
-        const line = lines[i];
-        const trimmed = line.trim();
+        const raw = lines[i], t = raw.trim();
 
-        // Headings
-        if (/^#{1,6} /.test(trimmed)) {
+        if (/^#{1,6} /.test(t)) {
             flushList();
-            const level = trimmed.match(/^(#+)/)[1].length;
-            const content = trimmed.replace(/^#+\s/, '');
-            const Tag = `h${level}`;
-            elements.push(<Tag key={key()}>{inlineFormat(content)}</Tag>);
+            const lvl = Math.min(t.match(/^(#+)/)[1].length, 6);
+            const content = t.replace(/^#+\s/, '');
+            const sizes   = [22, 18, 15, 14, 12, 11];
+            const weights = [800, 700, 700, 700, 600, 600];
+            const colors  = ['var(--text-primary)', 'var(--text-primary)', 'var(--accent-primary)', 'var(--accent-primary)', 'var(--text-secondary)', 'var(--text-muted)'];
+            const style   = { fontSize: sizes[lvl-1], fontWeight: weights[lvl-1], color: colors[lvl-1], margin: `${28 - lvl*3}px 0 ${12 - lvl}px` };
+            if (lvl === 3) {
+                elements.push(
+                    <div key={key()} style={{ ...style, display: 'flex', alignItems: 'center', gap: 8, marginTop: 22, marginBottom: 8 }}>
+                        <span style={{ display: 'inline-block', width: 4, height: 16, background: 'var(--accent-primary)', borderRadius: 2, flexShrink: 0 }} />
+                        <span>{inlineFmt(content)}</span>
+                    </div>
+                );
+            } else if (lvl === 2) {
+                elements.push(
+                    <div key={key()} style={{ ...style, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                        {inlineFmt(content)}
+                    </div>
+                );
+            } else {
+                elements.push(<div key={key()} style={style}>{inlineFmt(content)}</div>);
+            }
             i++; continue;
         }
 
-        // Horizontal rule
-        if (/^[-*_]{3,}$/.test(trimmed)) {
+        if (/^[-*_]{3,}$/.test(t)) {
             flushList();
-            elements.push(<hr key={key()} />);
+            elements.push(<hr key={key()} style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.07)', margin: '24px 0' }} />);
             i++; continue;
         }
 
-        // Blockquote
-        if (trimmed.startsWith('> ')) {
+        if (t.startsWith('> ')) {
             flushList();
-            elements.push(<blockquote key={key()}>{inlineFormat(trimmed.slice(2))}</blockquote>);
+            elements.push(
+                <blockquote key={key()} style={{
+                    borderLeft: '3px solid var(--accent-primary)', margin: '14px 0', padding: '12px 18px',
+                    background: 'rgba(124,106,255,0.06)', borderRadius: '0 12px 12px 0',
+                    color: 'var(--text-secondary)', fontStyle: 'italic', position: 'relative',
+                }}>
+                    <span style={{ position: 'absolute', top: -4, left: 12, fontSize: 32, color: 'var(--accent-primary)', opacity: 0.25, fontFamily: 'Georgia, serif', lineHeight: 1 }}>"</span>
+                    <span style={{ position: 'relative' }}>{inlineFmt(t.slice(2))}</span>
+                </blockquote>
+            );
             i++; continue;
         }
 
-        // Code block
-        if (trimmed.startsWith('```')) {
+        if (t.startsWith('```')) {
             flushList();
-            const lang = trimmed.slice(3).trim();
             const codeLines = [];
             i++;
-            while (i < lines.length && !lines[i].trim().startsWith('```')) {
-                codeLines.push(lines[i]);
-                i++;
-            }
+            while (i < lines.length && !lines[i].trim().startsWith('```')) { codeLines.push(lines[i]); i++; }
             elements.push(
-                <pre key={key()}>
-                    <code>{codeLines.join('\n')}</code>
+                <pre key={key()} style={{
+                    background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: 12, padding: '18px 20px', overflowX: 'auto', margin: '14px 0', position: 'relative',
+                }}>
+                    <span style={{ position: 'absolute', top: 10, right: 14, fontSize: 10, color: 'rgba(255,255,255,0.2)', fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: 1 }}>code</span>
+                    <code style={{ background: 'none', fontSize: 13, color: 'rgba(255,255,255,0.85)', fontFamily: "'JetBrains Mono', monospace" }}>{codeLines.join('\n')}</code>
                 </pre>
             );
             i++; continue;
         }
 
-        // Unordered list
-        if (/^[-*+] /.test(trimmed)) {
+        if (/^[-*+] /.test(t)) {
             if (listType !== 'ul') { flushList(); listType = 'ul'; }
-            listBuffer.push(trimmed.replace(/^[-*+] /, ''));
+            listBuffer.push(t.replace(/^[-*+] /, ''));
             i++; continue;
         }
 
-        // Ordered list
-        if (/^\d+\. /.test(trimmed)) {
+        if (/^\d+\. /.test(t)) {
             if (listType !== 'ol') { flushList(); listType = 'ol'; }
-            listBuffer.push(trimmed.replace(/^\d+\. /, ''));
+            listBuffer.push(t.replace(/^\d+\. /, ''));
             i++; continue;
         }
 
-        // Empty line
-        if (trimmed === '') {
+        if (t === '') {
             flushList();
-            elements.push(<div key={key()} style={{ height: 8 }} />);
+            elements.push(<div key={key()} style={{ height: 6 }} />);
             i++; continue;
         }
 
-        // Paragraph
         flushList();
-        elements.push(<p key={key()}>{inlineFormat(trimmed)}</p>);
+        elements.push(<p key={key()} style={{ margin: '0 0 12px', lineHeight: 1.8 }}>{inlineFmt(t)}</p>);
         i++;
     }
-
     flushList();
-    return <div className="md-content">{elements}</div>;
+    return <div className="db-md" style={{ fontSize: '14.5px', lineHeight: 1.8, color: 'var(--text-primary)', fontFamily: "'Outfit', sans-serif", animation: 'db-fadeIn 0.35s ease' }}>{elements}</div>;
 }
 
-// ─── Skeleton loader ──────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// SKELETON
+// ─────────────────────────────────────────────────────────────────────────────
 function ContentSkeleton() {
+    const rows = [92, 78, 86, 65, 90, 55, 82, 70, 94, 60, 75, 88];
     return (
-        <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {[100, 85, 92, 70, 88, 60, 95, 75].map((w, i) => (
-                <div key={i} className="skeleton"
-                    style={{ height: 16, width: `${w}%`, animationDelay: `${i * 0.08}s` }} />
+        <div style={{ padding: '28px 28px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {/* Fake heading */}
+            <div className="db-skeleton" style={{ height: 22, width: '55%', marginBottom: 6 }} />
+            {rows.map((w, i) => (
+                <div key={i} className="db-skeleton" style={{ height: 14, width: `${w}%`, animationDelay: `${i * 0.07}s` }} />
             ))}
-            <div style={{ height: 12 }} />
-            {[78, 65, 90, 55].map((w, i) => (
-                <div key={i + 10} className="skeleton"
-                    style={{ height: 16, width: `${w}%`, animationDelay: `${(i + 8) * 0.08}s` }} />
+            <div style={{ height: 8 }} />
+            <div className="db-skeleton" style={{ height: 18, width: '40%' }} />
+            {[80, 68, 74].map((w, i) => (
+                <div key={i+20} className="db-skeleton" style={{ height: 40, width: '100%', borderRadius: 10, animationDelay: `${(i+12) * 0.07}s` }} />
             ))}
         </div>
     );
 }
 
-// ─── Quiz loading overlay ─────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// QUIZ LOADING OVERLAY
+// ─────────────────────────────────────────────────────────────────────────────
 function QuizLoadingOverlay() {
-    const [dot, setDot] = useState(0);
+    const [step, setStep] = useState(0);
+    const steps = ['Analyzing topic…', 'Building questions…', 'Calibrating difficulty…', 'Almost ready…'];
     useEffect(() => {
-        const t = setInterval(() => setDot(d => (d + 1) % 4), 420);
+        const t = setInterval(() => setStep(s => Math.min(s + 1, steps.length - 1)), 1200);
         return () => clearInterval(t);
     }, []);
+
     return (
         <div style={{
-            position: 'absolute', inset: 0, background: 'var(--bg-card)',
-            zIndex: 20, display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center', borderRadius: 20,
-            animation: 'fadeIn 0.2s ease',
+            position: 'absolute', inset: 0, zIndex: 20,
+            background: 'var(--bg-card)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            justifyContent: 'center', borderRadius: 'var(--db-radius)',
+            animation: 'db-fadeIn 0.2s ease',
         }}>
-            {/* Pulsing brain icon */}
-            <div style={{ position: 'relative', marginBottom: 28 }}>
+            {/* Orbiting ring */}
+            <div style={{ position: 'relative', width: 96, height: 96, marginBottom: 32 }}>
                 <div style={{
-                    position: 'absolute', inset: -12,
-                    borderRadius: '50%', background: 'rgba(124,106,255,0.18)',
-                    animation: 'pulse-ring 1.4s ease-out infinite',
+                    position: 'absolute', inset: 0, borderRadius: '50%',
+                    background: 'rgba(124,106,255,0.15)',
+                    animation: 'db-ring 1.6s ease-out infinite',
                 }} />
                 <div style={{
-                    width: 72, height: 72, borderRadius: '50%',
-                    background: 'var(--gradient-primary)',
+                    position: 'absolute', inset: 8, borderRadius: '50%',
+                    background: 'rgba(124,106,255,0.1)',
+                    animation: 'db-ring 1.6s ease-out 0.4s infinite',
+                }} />
+                <div style={{
+                    position: 'absolute', inset: 0, borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #7c6aff, #a78bfa)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    boxShadow: '0 0 32px rgba(124,106,255,0.45)',
+                    boxShadow: '0 0 32px rgba(124,106,255,0.5)',
                 }}>
-                    <Brain size={32} color="#fff" />
+                    <Brain size={36} color="#fff" />
                 </div>
             </div>
-            <h3 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 700 }}>
-                Crafting your quiz{'.'.repeat(dot)}
+
+            <h3 style={{ margin: '0 0 10px', fontSize: 19, fontWeight: 700, fontFamily: "'Outfit', sans-serif" }}>
+                Generating Quiz
             </h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: 14, margin: 0 }}>
-                AI is building contextual questions
-            </p>
-            {/* Mini progress bar */}
-            <div style={{
-                marginTop: 28, width: 200, height: 4,
-                background: 'var(--bg-card-hover)', borderRadius: 4, overflow: 'hidden',
+            <p style={{
+                color: 'var(--text-secondary)', fontSize: 13, margin: '0 0 24px',
+                minHeight: 20, transition: 'opacity 0.3s',
+                fontFamily: "'Outfit', sans-serif",
             }}>
-                <div style={{
-                    height: '100%', borderRadius: 4,
-                    background: 'var(--gradient-primary)',
-                    animation: 'shimmer 1.4s infinite linear',
-                    backgroundSize: '400px 100%',
-                    backgroundImage: 'linear-gradient(90deg, var(--accent-primary) 0%, rgba(124,106,255,0.3) 50%, var(--accent-primary) 100%)',
-                }} />
+                {steps[step]}
+            </p>
+
+            {/* Animated dots */}
+            <div style={{ display: 'flex', gap: 7 }}>
+                <span className="db-dot" />
+                <span className="db-dot" />
+                <span className="db-dot" />
+            </div>
+
+            {/* Step indicators */}
+            <div style={{ display: 'flex', gap: 8, marginTop: 28 }}>
+                {steps.map((_, i) => (
+                    <div key={i} style={{
+                        width: i <= step ? 20 : 6, height: 6,
+                        borderRadius: 3,
+                        background: i <= step ? 'var(--accent-primary)' : 'rgba(255,255,255,0.12)',
+                        transition: 'width 0.4s ease, background 0.3s',
+                    }} />
+                ))}
             </div>
         </div>
     );
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// READING PROGRESS
+// ─────────────────────────────────────────────────────────────────────────────
+function ReadingProgress({ scrollRef }) {
+    const [pct, setPct] = useState(0);
+    useEffect(() => {
+        const el = scrollRef.current;
+        if (!el) return;
+        const onScroll = () => {
+            const { scrollTop, scrollHeight, clientHeight } = el;
+            const max = scrollHeight - clientHeight;
+            setPct(max > 0 ? (scrollTop / max) * 100 : 0);
+        };
+        el.addEventListener('scroll', onScroll);
+        return () => el.removeEventListener('scroll', onScroll);
+    }, [scrollRef]);
+    return (
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, zIndex: 5, background: 'rgba(255,255,255,0.05)', borderRadius: '24px 24px 0 0', overflow: 'hidden' }}>
+            <div style={{
+                height: '100%', borderRadius: '0 3px 3px 0',
+                background: 'linear-gradient(90deg, #7c6aff, #a78bfa)',
+                width: `${pct}%`, transition: 'width 0.1s linear',
+            }} />
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MAIN COMPONENT
+// ─────────────────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
-    const { user } = useAuth();
-    const toast = useToast();
-    const navigate = useNavigate();
+    const { user }   = useAuth();
+    const toast      = useToast();
+    const navigate   = useNavigate();
     const { setCurrentTopicId: setDoubtTopicId, setCurrentTopicTitle: setDoubtTopicTitle } = useDoubt();
 
-    const [explanation, setExplanation]   = useState(null);
-    const [simplified, setSimplified]     = useState(null);
-    const [references, setReferences]     = useState(null);
+    const [explanation,    setExplanation]    = useState(null);
+    const [simplified,     setSimplified]     = useState(null);
+    const [references,     setReferences]     = useState(null);
     const [contentLoading, setContentLoading] = useState(false);
-    const [activeTab, setActiveTab]       = useState('explain');
+    const [activeTab,      setActiveTab]      = useState('explain');
     const [currentTopicId, setCurrentTopicId] = useState(null);
+    const [currentTopicTitle, setCurrentTopicTitle] = useState('');
 
-    const [flipped, setFlipped]           = useState(false);
-    const [quiz, setQuiz]                 = useState(null);
-    const [quizLoading, setQuizLoading]   = useState(false);
+    const [flipped,      setFlipped]      = useState(false);
+    const [quiz,         setQuiz]         = useState(null);
+    const [quizLoading,  setQuizLoading]  = useState(false);
+    const [currentQIdx,  setCurrentQIdx]  = useState(0);
+    const [answers,      setAnswers]      = useState({});
+    const [submitted,    setSubmitted]    = useState(false);
+    const [quizScore,    setQuizScore]    = useState(null);
+    const [submitLoading,setSubmitLoading]= useState(false);
+    const [allPlans,     setAllPlans]     = useState([]);
+    const [pageReady,    setPageReady]    = useState(false);
 
-    const [currentQIndex, setCurrentQIndex] = useState(0);
-    const [answers, setAnswers]           = useState({});
-    const [submitted, setSubmitted]       = useState(false);
-    const [quizScore, setQuizScore]       = useState(null);
-    const [submitLoading, setSubmitLoading] = useState(false);
-    const [allPlans, setAllPlans]         = useState([]);
+    const contentScrollRef = useRef(null);
 
-    // Inject styles once
     useEffect(() => {
         if (!document.getElementById('db-styles')) {
             const s = document.createElement('style');
-            s.id = 'db-styles';
-            s.textContent = STYLES;
+            s.id = 'db-styles'; s.textContent = STYLES;
             document.head.appendChild(s);
         }
         loadCurrentTopic();
@@ -386,217 +586,209 @@ export default function DashboardPage() {
             const res = await api.getPlans();
             const plans = res.plans || [];
             setAllPlans(plans);
+            setPageReady(true);
             if (plans.length > 0) {
                 const sorted = [...plans].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
                 const active = sorted[0];
                 if (active.days) {
                     for (const day of active.days) {
-                        const incomplete = day.topics?.find(t => !t.completed);
-                        if (incomplete) {
-                            setCurrentTopicId(incomplete.topicId);
-                            setDoubtTopicId(incomplete.topicId);
-                            setDoubtTopicTitle(incomplete.title);
-                            // Reset cached content when topic changes
-                            setExplanation(null);
-                            setSimplified(null);
-                            setReferences(null);
-                            fetchContent(incomplete.topicId, 'explain');
+                        const inc = day.topics?.find(t => !t.completed);
+                        if (inc) {
+                            setCurrentTopicId(inc.topicId);
+                            setCurrentTopicTitle(inc.title || '');
+                            setDoubtTopicId(inc.topicId);
+                            setDoubtTopicTitle(inc.title);
+                            setExplanation(null); setSimplified(null); setReferences(null);
+                            fetchContent(inc.topicId, 'explain');
                             return;
                         }
                     }
                 }
             }
-        } catch { /* ignore */ }
+        } catch { setPageReady(true); }
     }
 
     async function fetchContent(topicId, tab) {
         setContentLoading(true);
         try {
             if (tab === 'explain') {
-                const res = await api.getExplanation(topicId);
-                setExplanation(res.content);
+                const r = await api.getExplanation(topicId);
+                setExplanation(r.content);
             } else if (tab === 'simplify') {
-                const res = await api.getSimplified(topicId);
-                setSimplified(res.content);
-            } else if (tab === 'references') {
-                const res = await api.getReferences(topicId);
-                setReferences(res.references || res.content || []);
+                const r = await api.getSimplified(topicId);
+                setSimplified(r.content);
+            } else {
+                const r = await api.getReferences(topicId);
+                setReferences(r.references || r.content || []);
             }
-        } catch {
-            toast.error('Failed to load content.');
-        } finally {
-            setContentLoading(false);
-        }
+        } catch { toast.error('Failed to load content.'); }
+        finally { setContentLoading(false); }
     }
 
     function handleTabSwitch(tab) {
         if (!currentTopicId || contentLoading || tab === activeTab) return;
         setActiveTab(tab);
-        // Use cache if already loaded
         const cached = tab === 'explain' ? explanation : tab === 'simplify' ? simplified : references;
         if (!cached) fetchContent(currentTopicId, tab);
     }
 
     async function handleTakeQuiz() {
-        if (!currentTopicId) {
-            toast.error('No active topic found.');
-            return;
-        }
+        if (!currentTopicId) { toast.error('No active topic found.'); return; }
         setQuizLoading(true);
         try {
-            const res = await api.generateTopicQuiz(currentTopicId);
-            setQuiz(res.quiz || res);
+            const r = await api.generateTopicQuiz(currentTopicId);
+            setQuiz(r.quiz || r);
             setFlipped(true);
-        } catch {
-            toast.error('Could not load quiz for this topic');
-        } finally {
-            setQuizLoading(false);
-        }
+        } catch { toast.error('Could not generate quiz for this topic'); }
+        finally { setQuizLoading(false); }
     }
 
     function selectAnswer(opt) {
         if (submitted) return;
         const qs = quiz.questions || quiz;
-        const qObj = qs[currentQIndex];
-        const qId = qObj.questionId || `q${currentQIndex}`;
+        const qId = qs[currentQIdx]?.questionId || `q${currentQIdx}`;
         setAnswers(prev => ({ ...prev, [qId]: opt }));
-        if (currentQIndex < qs.length - 1) {
-            setTimeout(() => setCurrentQIndex(c => c + 1), 320);
-        }
+        if (currentQIdx < qs.length - 1) setTimeout(() => setCurrentQIdx(c => c + 1), 300);
     }
 
     async function submitQuiz() {
         const qs = quiz.questions || quiz;
-        if (Object.keys(answers).length < qs.length) {
-            toast.error('Please answer all questions');
-            return;
-        }
+        if (Object.keys(answers).length < qs.length) { toast.error('Answer all questions first'); return; }
         setSubmitLoading(true);
         try {
-            const res = await api.submitQuiz(quiz.quizId, answers);
-            setQuizScore(res.score);
-            setSubmitted(true);
-            if (res.score >= 70 && currentTopicId) {
-                await api.markComplete(currentTopicId);
-                toast.success('Topic completed automatically! 🎉');
-                setTimeout(() => { resetToCoach(); loadCurrentTopic(); }, 1800);
-            }
+            const r = await api.submitQuiz(quiz.quizId, answers);
+            finalizeQuiz(r.score, qs);
         } catch {
-            // Local fallback
             let correct = 0;
-            qs.forEach((qObj, idx) => {
-                const id = qObj.questionId || `q${idx}`;
-                if (answers[id] === qObj.correctAnswer) correct++;
-            });
-            const localScore = Math.round((correct / qs.length) * 100);
-            setQuizScore(localScore);
-            setSubmitted(true);
-            if (localScore >= 70 && currentTopicId) {
-                try {
-                    await api.markComplete(currentTopicId);
-                    toast.success('Topic completed! 🎉');
-                    setTimeout(() => { resetToCoach(); loadCurrentTopic(); }, 1800);
-                } catch { /* ignore */ }
-            }
-        } finally {
-            setSubmitLoading(false);
+            qs.forEach((q, i) => { if (answers[q.questionId || `q${i}`] === q.correctAnswer) correct++; });
+            finalizeQuiz(Math.round((correct / qs.length) * 100), qs);
+        } finally { setSubmitLoading(false); }
+    }
+
+    async function finalizeQuiz(score, qs) {
+        setQuizScore(score);
+        setSubmitted(true);
+        if (score >= 70 && currentTopicId) {
+            try {
+                await api.markComplete(currentTopicId);
+                toast.success('🎉 Topic mastered & marked complete!');
+                setTimeout(() => { resetToCoach(); loadCurrentTopic(); }, 2200);
+            } catch { /* ignore */ }
         }
     }
 
     function resetToCoach() {
         setFlipped(false);
-        setQuiz(null);
-        setAnswers({});
-        setSubmitted(false);
-        setQuizScore(null);
-        setCurrentQIndex(0);
+        setTimeout(() => { setQuiz(null); setAnswers({}); setSubmitted(false); setQuizScore(null); setCurrentQIdx(0); }, 500);
     }
 
-    const qs = quiz ? (quiz.questions || quiz) : [];
-    const qObj = qs[currentQIndex];
-    const qId = qObj?.questionId || `q${currentQIndex}`;
+    const qs          = quiz ? (quiz.questions || quiz) : [];
+    const qObj        = qs[currentQIdx];
+    const qId         = qObj?.questionId || `q${currentQIdx}`;
     const selectedOpt = answers[qId];
-    const allAnswered = qs.length > 0 && Object.keys(answers).length === qs.length;
+    const allAnswered  = qs.length > 0 && Object.keys(answers).length === qs.length;
+    const currentContent = activeTab === 'explain' ? explanation : activeTab === 'simplify' ? simplified : null;
 
-    const currentContent = activeTab === 'explain' ? explanation
-        : activeTab === 'simplify' ? simplified : null;
+    if (!pageReady) {
+        return (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+                    <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'var(--gradient-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 28px rgba(124,106,255,0.4)', animation: 'db-pulse 1.5s ease infinite' }}>
+                        <Brain size={24} color="#fff" />
+                    </div>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: 14, fontFamily: "'Outfit', sans-serif" }}>Loading your learning session…</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
-        <div className="page-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingBottom: 32, paddingTop: 16 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '16px 16px 40px', maxWidth: 860, margin: '0 auto', width: '100%' }}>
 
-            {/* Empty state */}
-            {allPlans.length === 0 && !contentLoading && (
+            {/* ── Empty state ── */}
+            {allPlans.length === 0 && (
                 <div style={{
-                    padding: 48, textAlign: 'center',
-                    background: 'var(--bg-card)', border: '1px dashed var(--accent-primary)',
-                    borderRadius: 20, marginBottom: 32, width: '100%', maxWidth: 800,
-                    animation: 'fadeSlideUp 0.4s ease',
+                    width: '100%', padding: '56px 40px', textAlign: 'center',
+                    background: 'var(--bg-card)',
+                    border: '1px dashed rgba(124,106,255,0.35)',
+                    borderRadius: 'var(--db-radius)',
+                    animation: 'db-fadeUp 0.5s ease',
+                    position: 'relative', overflow: 'hidden',
                 }}>
-                    <BookOpen size={48} color="var(--accent-primary)" style={{ margin: '0 auto 20px' }} />
-                    <h2 style={{ fontSize: 24, fontWeight: 800 }}>Start Your Learning Journey</h2>
-                    <p style={{ color: 'var(--text-secondary)', margin: '12px auto 24px', maxWidth: 460 }}>
-                        Create your first study plan to begin learning with your AI tutor.
+                    {/* Background glow */}
+                    <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 300, height: 300, borderRadius: '50%', background: 'radial-gradient(circle, rgba(124,106,255,0.08) 0%, transparent 70%)', pointerEvents: 'none' }} />
+                    <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'linear-gradient(135deg, rgba(124,106,255,0.15), rgba(124,106,255,0.05))', border: '1px solid rgba(124,106,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+                        <BookOpen size={30} color="var(--accent-primary)" />
+                    </div>
+                    <h2 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 10px', fontFamily: "'Outfit', sans-serif" }}>Start Your Learning Journey</h2>
+                    <p style={{ color: 'var(--text-secondary)', margin: '0 auto 28px', maxWidth: 420, fontSize: 14, lineHeight: 1.6, fontFamily: "'Outfit', sans-serif" }}>
+                        Generate a personalized study plan from your materials or any topic to begin.
                     </p>
                     <button onClick={() => navigate('/plan')} className="btn btn-primary"
-                        style={{ padding: '12px 32px', borderRadius: 24 }}>
-                        Generate Study Plan
+                        style={{ padding: '12px 32px', borderRadius: 40, gap: 8, fontFamily: "'Outfit', sans-serif", fontWeight: 600 }}>
+                        <Sparkles size={16} /> Generate Study Plan
                     </button>
                 </div>
             )}
 
-            {/* 3D Flip Card */}
+            {/* ── Main flip card ── */}
             {allPlans.length > 0 && (
-                <div className="db-scene" style={{ maxWidth: 800 }}>
-                    <div className={`db-card ${flipped ? 'flipped' : ''}`}
-                        style={{ minHeight: 560 }}>
+                <div className="db-scene" style={{ width: '100%' }}>
+                    <div className={`db-card ${flipped ? 'flipped' : ''}`} style={{ minHeight: 600 }}>
 
-                        {/* ── FRONT: AI Coach ── */}
+                        {/* ════════════════════════════════════════
+                            FRONT — AI Coach
+                        ════════════════════════════════════════ */}
                         <div className="db-face db-front">
+                            <ReadingProgress scrollRef={contentScrollRef} />
 
                             {/* Header */}
-                            <div style={{
-                                padding: '20px 24px 16px',
-                                borderBottom: '1px solid var(--border-secondary)',
-                                display: 'flex', alignItems: 'center', gap: 12,
-                            }}>
+                            <div style={{ padding: '20px 24px 0', display: 'flex', alignItems: 'center', gap: 12 }}>
                                 <div style={{
-                                    width: 42, height: 42,
-                                    background: 'var(--gradient-primary)',
-                                    borderRadius: 12, display: 'flex',
-                                    alignItems: 'center', justifyContent: 'center',
-                                    boxShadow: '0 4px 16px rgba(124,106,255,0.35)',
+                                    width: 44, height: 44, borderRadius: 14, flexShrink: 0,
+                                    background: 'linear-gradient(135deg, #7c6aff, #a78bfa)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    boxShadow: '0 4px 20px rgba(124,106,255,0.4)',
                                 }}>
                                     <GraduationCap size={20} color="#fff" />
                                 </div>
-                                <div>
-                                    <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>AI Learning Coach</h2>
-                                    <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '3px 0 0' }}>
-                                        Your personalized study guide
-                                    </p>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontSize: 16, fontWeight: 700, fontFamily: "'Outfit', sans-serif", margin: 0 }}>
+                                        AI Learning Coach
+                                    </div>
+                                    {currentTopicTitle && (
+                                        <div style={{
+                                            fontSize: 12, color: 'var(--accent-primary)',
+                                            marginTop: 2, fontFamily: "'Outfit', sans-serif",
+                                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                            opacity: 0.85,
+                                        }}>
+                                            ▸ {currentTopicTitle}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
                             {/* Tabs */}
-                            <div style={{
-                                display: 'flex', gap: 24, padding: '0 24px',
-                                borderBottom: '1px solid var(--border-secondary)',
-                                overflowX: 'auto',
-                            }}>
+                            <div style={{ display: 'flex', gap: 20, padding: '0 24px', borderBottom: '1px solid rgba(255,255,255,0.07)', marginTop: 4, overflowX: 'auto' }}>
                                 {[
-                                    { id: 'explain',    label: '📖 Explanation' },
-                                    { id: 'simplify',   label: '✨ Simplified'  },
-                                    { id: 'references', label: '🔗 Resources'   },
+                                    { id: 'explain',    icon: '📖', label: 'Explanation' },
+                                    { id: 'simplify',   icon: '✨', label: 'Simplified'  },
+                                    { id: 'references', icon: '🔗', label: 'Resources'   },
                                 ].map(tab => (
                                     <button key={tab.id}
                                         className={`db-tab ${activeTab === tab.id ? 'active' : ''}`}
-                                        onClick={() => handleTabSwitch(tab.id)}>
-                                        {tab.label}
+                                        onClick={() => handleTabSwitch(tab.id)}
+                                        style={{ gap: 6, display: 'flex', alignItems: 'center' }}>
+                                        <span>{tab.icon}</span> {tab.label}
                                     </button>
                                 ))}
                             </div>
 
-                            {/* Content */}
-                            <div style={{ flex: 1, overflowY: 'auto', minHeight: 340, position: 'relative' }}>
+                            {/* Content scroll area */}
+                            <div ref={contentScrollRef} className="db-content-scroll"
+                                style={{ flex: 1, overflowY: 'auto', minHeight: 380, position: 'relative' }}>
+
                                 {quizLoading && <QuizLoadingOverlay />}
 
                                 {contentLoading ? (
@@ -604,154 +796,255 @@ export default function DashboardPage() {
                                 ) : activeTab === 'references' ? (
                                     <ReferencesPanel references={references} />
                                 ) : currentContent ? (
-                                    <div style={{ padding: '20px 24px', animation: 'fadeSlideUp 0.35s ease' }}>
+                                    <div style={{ padding: '20px 24px 24px', animation: 'db-slideLeft 0.3s ease' }}>
                                         {parseMarkdown(currentContent)}
                                     </div>
                                 ) : (
-                                    <div style={{
-                                        display: 'flex', flexDirection: 'column',
-                                        alignItems: 'center', justifyContent: 'center',
-                                        height: 280, color: 'var(--text-muted)', gap: 12,
-                                    }}>
-                                        <Brain size={36} style={{ opacity: 0.3 }} />
-                                        <p style={{ margin: 0, fontSize: 14 }}>No active topic — you might be all caught up!</p>
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 300, gap: 14, color: 'var(--text-muted)' }}>
+                                        <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'rgba(124,106,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <Brain size={24} style={{ opacity: 0.4 }} />
+                                        </div>
+                                        <p style={{ margin: 0, fontSize: 13, fontFamily: "'Outfit', sans-serif" }}>
+                                            {currentTopicId ? 'Loading content…' : 'All caught up! Create a new plan to continue.'}
+                                        </p>
                                     </div>
                                 )}
                             </div>
 
-                            {/* Footer actions */}
+                            {/* Footer */}
                             <div style={{
-                                padding: '16px 24px',
-                                borderTop: '1px solid var(--border-secondary)',
-                                background: 'var(--bg-card)', display: 'flex',
-                                justifyContent: 'center',
+                                padding: '14px 24px 20px',
+                                borderTop: '1px solid rgba(255,255,255,0.06)',
+                                background: 'rgba(0,0,0,0.12)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
                             }}>
                                 <button
-                                    className="btn btn-primary"
                                     onClick={handleTakeQuiz}
                                     disabled={quizLoading || !currentTopicId}
-                                    style={{ padding: '11px 28px', borderRadius: 22, gap: 8, fontSize: 15 }}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: 9,
+                                        padding: '12px 32px', borderRadius: 40,
+                                        background: 'linear-gradient(135deg, #7c6aff, #a78bfa)',
+                                        border: 'none', color: '#fff', fontWeight: 700,
+                                        fontSize: 14, cursor: quizLoading || !currentTopicId ? 'not-allowed' : 'pointer',
+                                        opacity: quizLoading || !currentTopicId ? 0.5 : 1,
+                                        boxShadow: '0 4px 20px rgba(124,106,255,0.4)',
+                                        transition: 'transform 0.15s, box-shadow 0.15s, opacity 0.2s',
+                                        fontFamily: "'Outfit', sans-serif",
+                                    }}
+                                    onMouseEnter={e => { if (!quizLoading && currentTopicId) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 28px rgba(124,106,255,0.55)'; }}}
+                                    onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 4px 20px rgba(124,106,255,0.4)'; }}
                                 >
                                     {quizLoading
-                                        ? <><Loader size={16} style={{ animation: 'spin 0.8s linear infinite' }} /> Generating...</>
-                                        : <><Zap size={16} /> Take Knowledge Quiz</>}
+                                        ? <><Loader size={15} style={{ animation: 'db-spin 0.7s linear infinite' }} /> Generating…</>
+                                        : <><Zap size={15} /> Take Knowledge Quiz</>}
                                 </button>
                             </div>
                         </div>
 
-                        {/* ── BACK: Quiz ── */}
+                        {/* ════════════════════════════════════════
+                            BACK — Quiz
+                        ════════════════════════════════════════ */}
                         <div className="db-face db-back">
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
-                                <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--accent-primary)', letterSpacing: 1, textTransform: 'uppercase' }}>
-                                    🧠 Topic Quiz
-                                </span>
-                                <button onClick={resetToCoach} className="btn btn-ghost btn-sm"
-                                    style={{ marginLeft: 'auto', gap: 6 }}>
-                                    <RotateCw size={13} /> Back
+
+                            {/* Quiz header */}
+                            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 24 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <div style={{ width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(135deg, #7c6aff, #a78bfa)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <Brain size={14} color="#fff" />
+                                    </div>
+                                    <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--accent-primary)', letterSpacing: 1.5, textTransform: 'uppercase', fontFamily: "'Outfit', sans-serif" }}>
+                                        Knowledge Check
+                                    </span>
+                                </div>
+                                <button onClick={resetToCoach}
+                                    style={{
+                                        marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6,
+                                        background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                                        borderRadius: 20, padding: '6px 14px', cursor: 'pointer',
+                                        color: 'var(--text-secondary)', fontSize: 12, fontWeight: 600,
+                                        transition: 'background 0.2s, color 0.2s',
+                                        fontFamily: "'Outfit', sans-serif",
+                                    }}
+                                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+                                >
+                                    <ChevronLeft size={12} /> Back
                                 </button>
                             </div>
 
+                            {/* Score screen */}
                             {submitted && quizScore !== null ? (
-                                // Score screen
-                                <div style={{ textAlign: 'center', paddingTop: 32 }}>
-                                    <div className="score-bounce">
-                                        <Trophy size={56}
-                                            color={quizScore >= 70 ? '#00d2a0' : '#ffb347'}
-                                            style={{ margin: '0 auto 16px' }} />
+                                <div style={{ textAlign: 'center', paddingTop: 24, animation: 'db-fadeUp 0.4s ease' }}>
+                                    <div className="db-trophy" style={{ marginBottom: 20 }}>
                                         <div style={{
-                                            fontSize: 72, fontWeight: 900, lineHeight: 1,
-                                            color: quizScore >= 70 ? '#00d2a0' : '#ffb347',
+                                            width: 80, height: 80, borderRadius: '50%', margin: '0 auto',
+                                            background: quizScore >= 70
+                                                ? 'radial-gradient(circle, rgba(0,229,160,0.2), transparent)'
+                                                : 'radial-gradient(circle, rgba(255,159,67,0.2), transparent)',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
                                         }}>
-                                            {quizScore}%
+                                            <Trophy size={44} color={quizScore >= 70 ? 'var(--db-green)' : 'var(--db-orange)'} />
                                         </div>
                                     </div>
-                                    <h3 style={{ fontSize: 22, marginTop: 16 }}>
-                                        {quizScore >= 70 ? 'Topic Mastered! 🎉' : 'Keep Reviewing 📚'}
-                                    </h3>
-                                    <p style={{ color: 'var(--text-secondary)', marginTop: 8, fontSize: 14 }}>
-                                        {quizScore >= 70
-                                            ? 'Automatically marked complete. Moving to next topic...'
-                                            : 'Review the explanation and try again when ready.'}
-                                    </p>
-                                    <button className="btn btn-primary" onClick={resetToCoach}
-                                        style={{ marginTop: 28, borderRadius: 20, padding: '11px 28px' }}>
-                                        Continue Learning
-                                    </button>
-                                </div>
-                            ) : qObj ? (
-                                <>
-                                    {/* Progress */}
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
-                                        <span>Question {currentQIndex + 1} / {qs.length}</span>
-                                        <span>{Object.keys(answers).length} answered</span>
+                                    <div className="db-score-num" style={{ color: quizScore >= 70 ? 'var(--db-green)' : 'var(--db-orange)' }}>
+                                        {quizScore}<span style={{ fontSize: 36, opacity: 0.6 }}>%</span>
                                     </div>
-                                    <div style={{ height: 5, background: 'var(--bg-card-hover)', borderRadius: 4, marginBottom: 28, overflow: 'hidden' }}>
+                                    <h3 style={{ fontSize: 20, fontWeight: 700, margin: '14px 0 8px', fontFamily: "'Outfit', sans-serif" }}>
+                                        {quizScore >= 70 ? '🎉 Topic Mastered!' : '📚 Keep Reviewing'}
+                                    </h3>
+                                    <p style={{ color: 'var(--text-secondary)', fontSize: 13, lineHeight: 1.6, maxWidth: 340, margin: '0 auto 28px', fontFamily: "'Outfit', sans-serif" }}>
+                                        {quizScore >= 70
+                                            ? 'Marked as complete. Moving to your next topic shortly…'
+                                            : 'Review the explanation tab and revisit this quiz when ready.'}
+                                    </p>
+
+                                    {/* Score breakdown bar */}
+                                    <div style={{ width: '100%', maxWidth: 280, margin: '0 auto 28px', height: 8, background: 'rgba(255,255,255,0.08)', borderRadius: 8, overflow: 'hidden' }}>
                                         <div style={{
-                                            height: '100%', borderRadius: 4,
-                                            background: 'var(--gradient-primary)',
-                                            width: `${(Object.keys(answers).length / qs.length) * 100}%`,
-                                            transition: 'width 0.4s ease',
+                                            height: '100%', borderRadius: 8,
+                                            background: quizScore >= 70
+                                                ? 'linear-gradient(90deg, #00e5a0, #00b884)'
+                                                : 'linear-gradient(90deg, #ff9f43, #ff6b6b)',
+                                            width: `${quizScore}%`,
+                                            transition: 'width 1s ease 0.3s',
                                         }} />
                                     </div>
 
-                                    <h3 style={{ fontSize: 18, fontWeight: 700, lineHeight: 1.55, marginBottom: 22 }}>
+                                    <button onClick={resetToCoach}
+                                        style={{
+                                            padding: '12px 32px', borderRadius: 40,
+                                            background: 'linear-gradient(135deg, #7c6aff, #a78bfa)',
+                                            border: 'none', color: '#fff', fontWeight: 700,
+                                            fontSize: 14, cursor: 'pointer',
+                                            boxShadow: '0 4px 20px rgba(124,106,255,0.4)',
+                                            fontFamily: "'Outfit', sans-serif",
+                                        }}>
+                                        Continue Learning
+                                    </button>
+                                </div>
+
+                            ) : qObj ? (
+                                <div style={{ animation: 'db-slideLeft 0.3s ease' }}>
+                                    {/* Progress bar */}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                        <span style={{ fontSize: 12, color: 'var(--text-muted)', fontFamily: "'Outfit', sans-serif" }}>
+                                            {currentQIdx + 1} <span style={{ opacity: 0.5 }}>/ {qs.length}</span>
+                                        </span>
+                                        <div style={{ display: 'flex', gap: 4 }}>
+                                            {qs.map((_, i) => (
+                                                <div key={i} style={{
+                                                    width: i === currentQIdx ? 18 : 6, height: 6,
+                                                    borderRadius: 3,
+                                                    background: answers[qs[i]?.questionId || `q${i}`]
+                                                        ? 'var(--accent-primary)'
+                                                        : i === currentQIdx
+                                                            ? 'rgba(124,106,255,0.5)'
+                                                            : 'rgba(255,255,255,0.1)',
+                                                    transition: 'width 0.3s, background 0.3s',
+                                                }} />
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div style={{ height: 4, background: 'rgba(255,255,255,0.07)', borderRadius: 4, marginBottom: 28, overflow: 'hidden' }}>
+                                        <div style={{
+                                            height: '100%', borderRadius: 4,
+                                            background: 'linear-gradient(90deg, #7c6aff, #a78bfa)',
+                                            width: `${((currentQIdx + 1) / qs.length) * 100}%`,
+                                            transition: 'width 0.4s cubic-bezier(0.4,0,0.2,1)',
+                                        }} />
+                                    </div>
+
+                                    <h3 style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.6, marginBottom: 24, fontFamily: "'Outfit', sans-serif" }}>
                                         {qObj.questionText}
                                     </h3>
 
-                                    {['A', 'B', 'C', 'D'].map(opt => {
+                                    {['A', 'B', 'C', 'D'].map((opt, oi) => {
                                         if (!qObj.options?.[opt]) return null;
-                                        const isSelected = selectedOpt === opt;
+                                        const isSel = selectedOpt === opt;
                                         return (
-                                            <button key={opt}
-                                                onClick={() => selectAnswer(opt)}
-                                                className={`opt-btn ${isSelected ? 'selected' : ''}`}
-                                                style={{ animationDelay: `${['A','B','C','D'].indexOf(opt) * 0.07}s` }}
+                                            <button key={opt} onClick={() => selectAnswer(opt)}
+                                                className={`db-opt ${isSel ? 'selected' : ''}`}
+                                                style={{ animationDelay: `${oi * 0.06}s` }}
                                             >
                                                 <div style={{
-                                                    width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-                                                    background: isSelected ? 'var(--gradient-primary)' : 'rgba(255,255,255,0.05)',
-                                                    border: isSelected ? 'none' : '1px solid var(--border-secondary)',
+                                                    width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+                                                    background: isSel ? 'linear-gradient(135deg, #7c6aff, #a78bfa)' : 'rgba(255,255,255,0.05)',
+                                                    border: isSel ? 'none' : '1px solid rgba(255,255,255,0.12)',
                                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                    fontSize: 12, fontWeight: 800,
-                                                    color: isSelected ? '#fff' : 'var(--text-secondary)',
+                                                    fontSize: 11, fontWeight: 800,
+                                                    color: isSel ? '#fff' : 'var(--text-secondary)',
+                                                    transition: 'background 0.2s, border 0.2s',
+                                                    boxShadow: isSel ? '0 2px 10px rgba(124,106,255,0.4)' : 'none',
                                                 }}>
                                                     {opt}
                                                 </div>
-                                                <span style={{ fontSize: 15, fontWeight: isSelected ? 600 : 500 }}>
+                                                <span style={{ fontSize: 14, fontWeight: isSel ? 600 : 400, fontFamily: "'Outfit', sans-serif" }}>
                                                     {qObj.options[opt]}
                                                 </span>
                                             </button>
                                         );
                                     })}
 
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 28, gap: 12 }}>
-                                        <button className="btn btn-secondary"
-                                            onClick={() => setCurrentQIndex(c => Math.max(0, c - 1))}
-                                            disabled={currentQIndex === 0}>
-                                            Previous
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24, gap: 12 }}>
+                                        <button
+                                            onClick={() => setCurrentQIdx(c => Math.max(0, c - 1))}
+                                            disabled={currentQIdx === 0}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', gap: 6,
+                                                padding: '10px 18px', borderRadius: 30,
+                                                background: 'rgba(255,255,255,0.05)',
+                                                border: '1px solid rgba(255,255,255,0.1)',
+                                                color: currentQIdx === 0 ? 'var(--text-muted)' : 'var(--text-primary)',
+                                                cursor: currentQIdx === 0 ? 'not-allowed' : 'pointer',
+                                                fontSize: 13, fontWeight: 600,
+                                                fontFamily: "'Outfit', sans-serif",
+                                                transition: 'background 0.2s',
+                                            }}>
+                                            <ChevronLeft size={13} /> Prev
                                         </button>
-                                        {currentQIndex < qs.length - 1 ? (
-                                            <button className="btn btn-primary"
-                                                onClick={() => setCurrentQIndex(c => c + 1)}
-                                                style={{ gap: 6 }}>
-                                                Next <ChevronRight size={14} />
+
+                                        {currentQIdx < qs.length - 1 ? (
+                                            <button onClick={() => setCurrentQIdx(c => c + 1)}
+                                                style={{
+                                                    display: 'flex', alignItems: 'center', gap: 6,
+                                                    padding: '10px 22px', borderRadius: 30,
+                                                    background: 'linear-gradient(135deg, #7c6aff, #a78bfa)',
+                                                    border: 'none', color: '#fff', fontWeight: 600,
+                                                    fontSize: 13, cursor: 'pointer',
+                                                    boxShadow: '0 3px 14px rgba(124,106,255,0.35)',
+                                                    fontFamily: "'Outfit', sans-serif",
+                                                }}>
+                                                Next <ChevronRight size={13} />
                                             </button>
                                         ) : (
-                                            <button className="btn btn-primary"
-                                                onClick={submitQuiz}
+                                            <button onClick={submitQuiz}
                                                 disabled={!allAnswered || submitLoading}
-                                                style={{ gap: 6 }}>
+                                                style={{
+                                                    display: 'flex', alignItems: 'center', gap: 6,
+                                                    padding: '10px 22px', borderRadius: 30,
+                                                    background: allAnswered ? 'linear-gradient(135deg, #00e5a0, #00b884)' : 'rgba(255,255,255,0.08)',
+                                                    border: 'none', color: allAnswered ? '#fff' : 'var(--text-muted)',
+                                                    fontWeight: 700, fontSize: 13,
+                                                    cursor: allAnswered && !submitLoading ? 'pointer' : 'not-allowed',
+                                                    boxShadow: allAnswered ? '0 3px 14px rgba(0,229,160,0.3)' : 'none',
+                                                    transition: 'background 0.3s, box-shadow 0.3s',
+                                                    fontFamily: "'Outfit', sans-serif",
+                                                }}>
                                                 {submitLoading
-                                                    ? <Loader size={14} style={{ animation: 'spin 0.8s linear infinite' }} />
-                                                    : <><CheckCircle size={14} /> Submit</>}
+                                                    ? <Loader size={13} style={{ animation: 'db-spin 0.7s linear infinite' }} />
+                                                    : <><CheckCircle size={13} /> Submit Quiz</>}
                                             </button>
                                         )}
                                     </div>
-                                </>
+                                </div>
+
                             ) : (
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300 }}>
-                                    <Loader size={32} color="var(--accent-primary)"
-                                        style={{ animation: 'spin 0.8s linear infinite' }} />
+                                    <div style={{ display: 'flex', gap: 8 }}>
+                                        <span className="db-dot" /><span className="db-dot" /><span className="db-dot" />
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -762,63 +1055,67 @@ export default function DashboardPage() {
     );
 }
 
-// ─── References Panel ─────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// REFERENCES PANEL
+// ─────────────────────────────────────────────────────────────────────────────
 function ReferencesPanel({ references }) {
-    if (!references) {
-        return (
-            <div style={{ padding: 24 }}>
-                <ContentSkeleton />
-            </div>
-        );
-    }
+    if (!references) return <div style={{ padding: 24 }}><ContentSkeleton /></div>;
 
     if (typeof references === 'string') {
-        return (
-            <div style={{ padding: '20px 24px', animation: 'fadeSlideUp 0.35s ease' }}>
-                {parseMarkdown(references)}
-            </div>
-        );
+        return <div style={{ padding: '20px 24px', animation: 'db-slideLeft 0.3s ease' }}>{parseMarkdown(references)}</div>;
     }
 
     if (Array.isArray(references) && references.length > 0) {
         return (
-            <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {references.map((ref, idx) => (
-                    <a key={idx} href={ref.url} target="_blank" rel="noopener noreferrer"
-                        style={{
-                            display: 'flex', alignItems: 'center', gap: 14,
-                            padding: '14px 16px', background: 'var(--bg-card-hover)',
-                            borderRadius: 12, border: '1px solid var(--border-secondary)',
-                            textDecoration: 'none', transition: 'border-color 0.2s, transform 0.15s',
-                            animation: `fadeSlideUp 0.3s ease ${idx * 0.06}s both`,
-                        }}
-                        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent-primary)'; e.currentTarget.style.transform = 'translateX(4px)'; }}
-                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-secondary)'; e.currentTarget.style.transform = 'translateX(0)'; }}
-                    >
-                        <div style={{
-                            width: 36, height: 36, borderRadius: 8, flexShrink: 0,
-                            background: 'rgba(124,106,255,0.15)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }}>
-                            <ExternalLink size={16} color="var(--accent-primary)" />
-                        </div>
-                        <div style={{ overflow: 'hidden' }}>
-                            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--accent-primary)', marginBottom: 2 }}>
-                                {ref.title || new URL(ref.url).hostname}
+            <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {references.map((ref, idx) => {
+                    let hostname = ref.url;
+                    try { hostname = new URL(ref.url).hostname.replace('www.', ''); } catch {}
+                    return (
+                        <a key={idx} href={ref.url} target="_blank" rel="noopener noreferrer"
+                            style={{
+                                display: 'flex', alignItems: 'center', gap: 14,
+                                padding: '14px 16px',
+                                background: 'rgba(255,255,255,0.03)',
+                                borderRadius: 14,
+                                border: '1px solid rgba(255,255,255,0.07)',
+                                textDecoration: 'none',
+                                transition: 'border-color 0.2s, background 0.2s, transform 0.15s',
+                                animation: `db-fadeUp 0.3s ease ${idx * 0.07}s both`,
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(124,106,255,0.4)'; e.currentTarget.style.background = 'rgba(124,106,255,0.06)'; e.currentTarget.style.transform = 'translateX(4px)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.transform = ''; }}
+                        >
+                            <div style={{
+                                width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+                                background: 'rgba(124,106,255,0.12)',
+                                border: '1px solid rgba(124,106,255,0.2)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}>
+                                <ExternalLink size={15} color="var(--accent-primary)" />
                             </div>
-                            <div style={{ fontSize: 12, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {ref.url}
+                            <div style={{ overflow: 'hidden', flex: 1 }}>
+                                <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 3, fontFamily: "'Outfit', sans-serif" }}>
+                                    {ref.title || hostname}
+                                </div>
+                                <div style={{ fontSize: 11.5, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: "'Outfit', sans-serif" }}>
+                                    {hostname}
+                                </div>
                             </div>
-                        </div>
-                    </a>
-                ))}
+                            <ArrowRight size={14} color="var(--text-muted)" style={{ flexShrink: 0 }} />
+                        </a>
+                    );
+                })}
             </div>
         );
     }
 
     return (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--text-muted)', fontSize: 14 }}>
-            No resources found for this topic.
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 220, gap: 12, color: 'var(--text-muted)' }}>
+            <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(124,106,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <ExternalLink size={20} style={{ opacity: 0.4 }} />
+            </div>
+            <p style={{ margin: 0, fontSize: 13, fontFamily: "'Outfit', sans-serif" }}>No resources found for this topic</p>
         </div>
     );
 }
